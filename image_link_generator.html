@@ -1,0 +1,602 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ImageLink — 이미지 링크 생성기</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg: #0a0a0f; --surface: #111118; --surface2: #18181f;
+      --border: #2a2a35; --border-bright: #3d3d4f;
+      --accent: #7c6dfa; --accent2: #fa6d9e; --accent-glow: rgba(124,109,250,0.25);
+      --text: #e8e8f0; --text-muted: #6e6e88; --text-dim: #3a3a4f;
+      --success: #5af0a0; --mono: 'DM Mono', monospace; --sans: 'Syne', sans-serif;
+    }
+    html { scroll-behavior: smooth; }
+    body { background: var(--bg); color: var(--text); font-family: var(--sans); min-height: 100vh; overflow-x: hidden; }
+    body::before {
+      content: ''; position: fixed; inset: 0;
+      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.04'/%3E%3C/svg%3E");
+      pointer-events: none; z-index: 0; opacity: 0.6;
+    }
+    body::after {
+      content: ''; position: fixed; top: -200px; right: -200px; width: 700px; height: 700px;
+      border-radius: 50%; background: radial-gradient(circle, rgba(124,109,250,0.08) 0%, transparent 70%);
+      pointer-events: none; z-index: 0;
+    }
+    .container { position: relative; z-index: 1; max-width: 960px; margin: 0 auto; padding: 48px 24px 80px; }
+
+    /* HEADER */
+    header { display: flex; align-items: flex-end; justify-content: space-between; margin-bottom: 52px; padding-bottom: 28px; border-bottom: 1px solid var(--border); }
+    .logo { display: flex; flex-direction: column; gap: 4px; }
+    .logo-tag { font-family: var(--mono); font-size: 11px; color: var(--accent); letter-spacing: 0.15em; text-transform: uppercase; }
+    .logo-title { font-size: 28px; font-weight: 800; letter-spacing: -0.03em; line-height: 1; background: linear-gradient(135deg, var(--text) 0%, var(--accent) 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+    .header-badge { font-family: var(--mono); font-size: 11px; color: var(--text-muted); padding: 6px 12px; border: 1px solid var(--border); border-radius: 100px; }
+
+    /* SECTION */
+    .section-label { font-family: var(--mono); font-size: 10px; font-weight: 500; color: var(--text-muted); letter-spacing: 0.2em; text-transform: uppercase; margin-bottom: 12px; display: flex; align-items: center; gap: 8px; }
+    .section-label::after { content: ''; flex: 1; height: 1px; background: var(--border); }
+
+    /* PANEL (controls / url template share the same look as the dropzone's cousin) */
+    .controls-panel { background: var(--surface); border: 1px solid var(--border); border-radius: 16px; padding: 24px; margin-bottom: 32px; }
+
+    .field { display: flex; flex-direction: column; gap: 6px; }
+    .field-label { font-family: var(--mono); font-size: 10px; color: var(--text-muted); letter-spacing: 0.12em; text-transform: uppercase; }
+    .field-hint { font-family: var(--mono); font-size: 10px; color: var(--text-dim); }
+    .field-hint code { color: var(--accent); }
+    input[type="text"], input[type="number"], select {
+      background: var(--surface2); border: 1px solid var(--border); border-radius: 8px; color: var(--text);
+      font-family: var(--mono); font-size: 13px; padding: 10px 14px; outline: none;
+      transition: border-color 0.15s, box-shadow 0.15s; width: 100%;
+    }
+    input[type="text"]:focus, input[type="number"]:focus, select:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-glow); }
+    input::placeholder { color: var(--text-dim); }
+    select { cursor: pointer; }
+
+    .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+
+    .nb-row { display: grid; grid-template-columns: 1fr auto 1fr auto 1fr; gap: 10px; align-items: end; padding-top: 16px; margin-top: 16px; border-top: 1px solid var(--border); }
+    .range-sep { font-family: var(--mono); font-size: 16px; color: var(--text-muted); padding-bottom: 10px; text-align: center; }
+
+    /* TAG INPUT (CH / LO) */
+    .tagbox {
+      background: var(--surface2); border: 1px solid var(--border); border-radius: 8px;
+      padding: 8px 10px; min-height: 44px; display: flex; flex-wrap: wrap; align-items: center; gap: 8px;
+      cursor: text; transition: border-color 0.15s, box-shadow 0.15s;
+    }
+    .tagbox:focus-within { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-glow); }
+    .tag-chip {
+      display: inline-flex; align-items: center; gap: 4px;
+      background: rgba(124,109,250,0.12); border: 1px solid var(--accent);
+      color: var(--text); font-size: 12px; font-family: var(--mono);
+      padding: 4px 4px 4px 10px; border-radius: 100px;
+    }
+    .tag-chip button { border: none; background: transparent; color: var(--accent); cursor: pointer; font-size: 14px; line-height: 1; padding: 2px 6px; border-radius: 50%; }
+    .tag-chip button:hover { background: rgba(124,109,250,0.2); color: var(--accent2); }
+    .chip-settings-btn { font-size: 11px !important; position: relative; }
+    .chip-extra-dot {
+      position: absolute; top: -4px; right: -4px; background: var(--accent2); color: #fff;
+      font-family: var(--mono); font-size: 8px; min-width: 13px; height: 13px; line-height: 13px;
+      text-align: center; border-radius: 100px; padding: 0 2px;
+    }
+    .tagbox input { flex: 1; min-width: 80px; border: none !important; background: transparent !important; padding: 5px 2px !important; font-size: 13px; box-shadow: none !important; }
+    .tag-count { width: 100%; text-align: right; font-family: var(--mono); font-size: 9px; color: var(--text-dim); margin-top: 2px; }
+    .lo-extra-hint { color: var(--accent2); font-size: 10px; }
+
+    /* LO 추가 번호 설정 모달 */
+    #loModalOverlay {
+      position: fixed; inset: 0; background: rgba(0,0,0,0.6); backdrop-filter: blur(3px);
+      display: flex; align-items: center; justify-content: center; z-index: 1000;
+      opacity: 0; visibility: hidden; transition: opacity 0.2s;
+    }
+    #loModalOverlay.show { opacity: 1; visibility: visible; }
+    .lo-modal {
+      background: var(--surface); border: 1px solid var(--border-bright); border-radius: 16px;
+      padding: 24px; width: 90%; max-width: 380px; transform: translateY(12px); transition: transform 0.2s;
+    }
+    #loModalOverlay.show .lo-modal { transform: translateY(0); }
+    .lo-modal h3 { font-family: var(--mono); font-size: 13px; color: var(--text); margin-bottom: 6px; font-weight: 500; }
+    .lo-modal .field-hint { margin-bottom: 12px; }
+    .lo-modal-actions { display: flex; gap: 10px; margin-top: 18px; }
+    .lo-modal-actions .btn { flex: 1; justify-content: center; }
+
+    /* BUTTONS */
+    .btn { font-family: var(--sans); font-weight: 700; font-size: 13px; letter-spacing: 0.02em; border: none; border-radius: 8px; cursor: pointer; padding: 11px 20px; transition: all 0.15s ease; display: inline-flex; align-items: center; gap: 7px; white-space: nowrap; }
+    .btn-primary { background: var(--accent); color: #fff; box-shadow: 0 2px 12px rgba(124,109,250,0.35); }
+    .btn-primary:hover { background: #9184fb; transform: translateY(-1px); box-shadow: 0 4px 20px rgba(124,109,250,0.45); }
+    .btn-primary:active { transform: translateY(0); }
+    .btn-primary.full { width: 100%; justify-content: center; padding: 13px 20px; font-size: 14px; }
+    .btn-ghost { background: var(--surface2); color: var(--text-muted); border: 1px solid var(--border); }
+    .btn-ghost:hover { background: var(--border); color: var(--text); }
+    .btn-sm { font-size: 11px; padding: 7px 12px; border-radius: 6px; }
+
+    /* SUMMARY */
+    #summary { display: none; font-family: var(--mono); font-size: 11px; color: var(--text-muted); background: var(--surface2); border: 1px solid var(--border); border-radius: 100px; padding: 8px 16px; margin-bottom: 20px; }
+    #summary strong { color: var(--accent); }
+    #summary.error { color: var(--accent2); border-color: rgba(250,109,158,0.3); }
+
+    .list-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+    .image-count { font-family: var(--mono); font-size: 11px; color: var(--text-muted); background: var(--surface2); border: 1px solid var(--border); padding: 4px 10px; border-radius: 100px; }
+
+    /* RESULTS — CH > LO > NB tree */
+    .ch-group { background: var(--surface); border: 1px solid var(--border); border-radius: 16px; margin-bottom: 14px; overflow: hidden; }
+    .ch-header {
+      padding: 13px 18px; font-family: var(--mono); font-weight: 500; font-size: 13px;
+      color: var(--text); border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 8px;
+    }
+    .ch-header .badge-tag { font-size: 9px; color: var(--accent); letter-spacing: 0.1em; background: rgba(124,109,250,0.12); border: 1px solid var(--accent); border-radius: 4px; padding: 2px 6px; }
+    .ch-body { padding: 16px 18px; display: flex; flex-direction: column; gap: 16px; }
+    .lo-label { font-family: var(--mono); font-size: 11px; color: var(--text-muted); margin-bottom: 10px; display: flex; align-items: center; gap: 6px; }
+    .lo-label .badge-tag2 { font-size: 9px; color: var(--accent2); letter-spacing: 0.1em; background: rgba(250,109,158,0.12); border: 1px solid var(--accent2); border-radius: 4px; padding: 2px 6px; }
+
+    .nb-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 10px; }
+    .nb-item { border: 1px solid var(--border); border-radius: 10px; padding: 6px; background: var(--surface2); display: flex; flex-direction: column; gap: 6px; transition: border-color .15s; }
+    .nb-item:hover { border-color: var(--border-bright); }
+    .nb-thumb { width: 100%; height: 84px; border-radius: 8px; background: var(--bg); display: flex; align-items: center; justify-content: center; overflow: hidden; }
+    .nb-thumb img { max-width: 100%; max-height: 100%; object-fit: contain; display: block; }
+    .nb-thumb .broken { color: var(--accent2); font-size: 20px; font-family: var(--mono); }
+    .nb-link { font-family: var(--mono); font-size: 11px; color: var(--text-muted); text-decoration: none; text-align: center; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .nb-link:hover { color: var(--accent); }
+
+    #empty-state { text-align: center; padding: 48px 0; color: var(--text-dim); font-family: var(--mono); font-size: 12px; }
+
+    /* TOAST */
+    #toast { position: fixed; bottom: 32px; right: 32px; background: var(--surface2); border: 1px solid var(--border-bright); border-radius: 10px; padding: 12px 18px; font-family: var(--mono); font-size: 12px; color: var(--text); box-shadow: 0 8px 32px rgba(0,0,0,0.4); transform: translateY(80px); opacity: 0; transition: transform 0.3s cubic-bezier(0.34,1.56,0.64,1), opacity 0.3s; z-index: 999; display: flex; align-items: center; gap: 8px; }
+    #toast.show { transform: translateY(0); opacity: 1; }
+
+    ::-webkit-scrollbar { width: 6px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: var(--border-bright); border-radius: 3px; }
+
+    @media (max-width: 600px) {
+      header { flex-direction: column; align-items: flex-start; gap: 16px; }
+      .grid2 { grid-template-columns: 1fr; }
+      .nb-row { grid-template-columns: 1fr auto 1fr; grid-template-rows: auto auto; }
+      .nb-row .padding-field { grid-column: 1 / -1; }
+    }
+  </style>
+</head>
+<body>
+<div class="container">
+  <header>
+    <div class="logo">
+      <span class="logo-tag">// image link generator</span>
+      <span class="logo-title">ImageLink</span>
+    </div>
+    <span class="header-badge">v1.0.0</span>
+  </header>
+
+  <form id="genForm" onsubmit="return false;">
+
+    <div class="section-label">01 &nbsp;URL 템플릿</div>
+    <div class="controls-panel">
+      <div class="field">
+        <span class="field-label">이미지 URL</span>
+        <span class="field-hint">키워드 <code>{CH}</code> <code>{LO}</code> <code>{NB}</code> 사용 시 값 자동 치환</span>
+        <input type="text" id="urlTemplate" value="https://example.com/{CH}/{LO}_{NB}.png" placeholder="예) https://example.com/{CH}/{LO}_{NB}.png" />
+      </div>
+    </div>
+
+    <div class="section-label">02 &nbsp;키워드 설정</div>
+    <div class="controls-panel">
+      <div class="grid2">
+        <div class="field">
+          <span class="field-label">{CH} 캐릭터</span>
+          <span class="field-hint">단어 입력 후 엔터</span>
+          <div class="tagbox" id="chBox">
+            <input type="text" id="chTagInput" placeholder="단어 입력 후 엔터" enterkeyhint="done" autocomplete="off" autocorrect="off" />
+          </div>
+          <span class="tag-count" id="chCount">0개</span>
+        </div>
+        <div class="field">
+          <span class="field-label">{LO} 장소</span>
+          <span class="field-hint">단어 입력 후 엔터</span>
+          <div class="tagbox" id="loBox">
+            <input type="text" id="loTagInput" placeholder="단어 입력 후 엔터" enterkeyhint="done" autocomplete="off" autocorrect="off" />
+          </div>
+          <span class="tag-count" id="loCount">0개</span>
+        </div>
+      </div>
+      <div class="nb-row">
+        <div class="field">
+          <span class="field-label">{NB} 시작</span>
+          <input type="number" id="nbStart" value="1" min="0" />
+        </div>
+        <div class="range-sep">→</div>
+        <div class="field">
+          <span class="field-label">{NB} 끝</span>
+          <input type="number" id="nbEnd" value="3" min="0" />
+        </div>
+        <div style="width:4px;"></div>
+        <div class="field padding-field">
+          <span class="field-label">번호 패딩</span>
+          <span class="field-hint">1=1, 2=01, 3=001</span>
+          <input type="number" id="nbPad" value="2" min="1" max="6" />
+        </div>
+      </div>
+    </div>
+
+    <button type="button" class="btn btn-primary full" id="genBtn">
+      <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><path d="M5 13l4 4L19 7"/></svg>
+      링크 생성하기
+    </button>
+
+  </form>
+
+  <div style="height:24px;"></div>
+
+  <div id="summary"></div>
+
+  <div class="list-header">
+    <div class="section-label" style="margin-bottom:0; flex:1;">03 &nbsp;결과</div>
+    <button class="btn btn-ghost btn-sm" id="copyAllBtn" style="display:none;">전체 링크 복사</button>
+  </div>
+
+  <div id="results"></div>
+  <div id="empty-state">아직 생성된 링크가 없습니다.</div>
+</div>
+
+<div id="toast"><span class="toast-icon"></span><span id="toast-msg"></span></div>
+
+<div id="loModalOverlay">
+  <div class="lo-modal">
+    <h3 id="loModalTitle">{LO} — 추가 번호</h3>
+    <span class="field-hint">공통 NB 범위에 더해질 번호만 추가로 입력 (숫자만, 엔터로 추가)</span>
+    <div class="tagbox" id="loModalTagbox">
+      <input type="text" id="loModalInput" placeholder="숫자 입력 후 엔터" enterkeyhint="done" autocomplete="off" autocorrect="off" inputmode="numeric" />
+    </div>
+    <div class="lo-modal-actions">
+      <button type="button" class="btn btn-ghost" id="loModalCancel">취소</button>
+      <button type="button" class="btn btn-primary" id="loModalSave">저장</button>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ---- tag input logic (CH / LO) ---- */
+// extraNumbersStore: LO별 추가 번호를 저장하는 곳 { '장소이름': [11, 12, ...] }
+const loExtraNumbers = {};
+
+function setupTagBox(boxId, inputId, countId, options) {
+  options = options || {};
+  const box = document.getElementById(boxId);
+  const input = document.getElementById(inputId);
+  const countEl = document.getElementById(countId);
+  const tags = [];
+
+  function render() {
+    box.querySelectorAll('.tag-chip').forEach(el => el.remove());
+    tags.forEach((tag, idx) => {
+      const chip = document.createElement('span');
+      chip.className = 'tag-chip';
+
+      const label = document.createElement('span');
+      label.textContent = tag;
+      chip.appendChild(label);
+
+      if (options.withSettings) {
+        const settingsBtn = document.createElement('button');
+        settingsBtn.type = 'button';
+        settingsBtn.className = 'chip-settings-btn';
+        settingsBtn.textContent = '⚙️';
+        settingsBtn.setAttribute('aria-label', '번호 추가 설정');
+        const extraCount = (loExtraNumbers[tag] || []).length;
+        if (extraCount > 0) {
+          const dot = document.createElement('span');
+          dot.className = 'chip-extra-dot';
+          dot.textContent = extraCount;
+          settingsBtn.appendChild(dot);
+        }
+        settingsBtn.addEventListener('click', (ev) => {
+          ev.preventDefault();
+          ev.stopPropagation();
+          openLoSettingsModal(tag, render);
+        });
+        chip.appendChild(settingsBtn);
+      }
+
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'chip-remove-btn';
+      btn.textContent = '×';
+      btn.setAttribute('aria-label', '삭제');
+      btn.addEventListener('click', (ev) => {
+        ev.preventDefault();
+        ev.stopPropagation();
+        tags.splice(idx, 1);
+        render();
+      });
+      chip.appendChild(btn);
+      box.insertBefore(chip, input);
+    });
+    countEl.textContent = tags.length + '개';
+  }
+
+  function commitTag() {
+    const val = input.value.trim();
+    if (val && !tags.includes(val)) tags.push(val);
+    input.value = '';
+    render();
+  }
+
+  // 엔터가 폼 제출이나 다음 요소로 포커스 이동시키지 않도록 keydown + keypress 모두 차단
+  input.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' || e.keyCode === 13) {
+      e.preventDefault();
+      e.stopPropagation();
+      commitTag();
+      input.focus();
+      return false;
+    }
+    if (e.key === 'Backspace' && input.value === '' && tags.length > 0) {
+      tags.pop();
+      render();
+    }
+  });
+  input.addEventListener('keypress', (e) => {
+    if (e.key === 'Enter' || e.keyCode === 13) {
+      e.preventDefault();
+      e.stopPropagation();
+      return false;
+    }
+  });
+
+  // 모바일 가상 키보드(특히 한글 입력, Gboard 등)는 keydown의 preventDefault가
+  // 무시되고 값에 줄바꿈(\n)이 그대로 들어가는 경우가 있어, input 이벤트에서 한 번 더 감지
+  input.addEventListener('input', (e) => {
+    if (e.inputType === 'insertLineBreak' || input.value.includes('\n')) {
+      input.value = input.value.replace(/\n/g, '');
+      commitTag();
+      input.focus();
+    }
+  });
+
+  box.addEventListener('click', () => input.focus());
+
+  return { getTags: () => tags.slice() };
+}
+
+const chTags = setupTagBox('chBox', 'chTagInput', 'chCount');
+const loTags = setupTagBox('loBox', 'loTagInput', 'loCount', { withSettings: true });
+
+/* ---- LO 설정 모달 (추가 번호 지정) ---- */
+function openLoSettingsModal(loName, onSaved) {
+  const overlay = document.getElementById('loModalOverlay');
+  const titleEl = document.getElementById('loModalTitle');
+  const tagboxEl = document.getElementById('loModalTagbox');
+  const modalInput = document.getElementById('loModalInput');
+
+  titleEl.textContent = '{LO} ' + loName + ' — 추가 번호';
+
+  let extraTags = (loExtraNumbers[loName] || []).slice();
+
+  function renderModalTags() {
+    tagboxEl.querySelectorAll('.tag-chip').forEach(el => el.remove());
+    extraTags.forEach((tag, idx) => {
+      const chip = document.createElement('span');
+      chip.className = 'tag-chip';
+      const label = document.createElement('span');
+      label.textContent = tag;
+      chip.appendChild(label);
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'chip-remove-btn';
+      btn.textContent = '×';
+      btn.addEventListener('click', (ev) => {
+        ev.preventDefault();
+        ev.stopPropagation();
+        extraTags.splice(idx, 1);
+        renderModalTags();
+      });
+      chip.appendChild(btn);
+      tagboxEl.insertBefore(chip, modalInput);
+    });
+  }
+
+  function commitModalTag() {
+    const val = modalInput.value.trim();
+    if (val !== '' && !isNaN(Number(val)) && !extraTags.includes(val)) {
+      extraTags.push(val);
+    }
+    modalInput.value = '';
+    renderModalTags();
+  }
+
+  modalInput.value = '';
+  renderModalTags();
+
+  function handleEnter(e) {
+    if (e.key === 'Enter' || e.keyCode === 13) {
+      e.preventDefault();
+      e.stopPropagation();
+      commitModalTag();
+      modalInput.focus();
+    }
+  }
+  function handleInputEvent(e) {
+    if (e.inputType === 'insertLineBreak' || modalInput.value.includes('\n')) {
+      modalInput.value = modalInput.value.replace(/\n/g, '');
+      commitModalTag();
+      modalInput.focus();
+    }
+  }
+  modalInput.addEventListener('keydown', handleEnter);
+  modalInput.addEventListener('input', handleInputEvent);
+
+  function closeModal() {
+    overlay.classList.remove('show');
+    modalInput.removeEventListener('keydown', handleEnter);
+    modalInput.removeEventListener('input', handleInputEvent);
+    document.getElementById('loModalSave').removeEventListener('click', saveAndClose);
+    document.getElementById('loModalCancel').removeEventListener('click', closeModal);
+    overlay.removeEventListener('click', overlayClickHandler);
+  }
+  function saveAndClose() {
+    if (extraTags.length > 0) {
+      loExtraNumbers[loName] = extraTags.slice();
+    } else {
+      delete loExtraNumbers[loName];
+    }
+    closeModal();
+    if (onSaved) onSaved();
+  }
+  function overlayClickHandler(e) {
+    if (e.target === overlay) closeModal();
+  }
+
+  document.getElementById('loModalSave').addEventListener('click', saveAndClose);
+  document.getElementById('loModalCancel').addEventListener('click', closeModal);
+  overlay.addEventListener('click', overlayClickHandler);
+
+  overlay.classList.add('show');
+  setTimeout(() => modalInput.focus(), 50);
+}
+
+/* ---- generation logic ---- */
+function pad(n, len) {
+  if (!len || len < 1) len = 1;
+  return String(n).padStart(len, '0');
+}
+function escHtml(s) { return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+function buildUrl(template, ch, lo, nbStr) {
+  return template.split('{CH}').join(ch).split('{LO}').join(lo).split('{NB}').join(nbStr);
+}
+
+let lastGeneratedUrls = [];
+let toastTimer;
+function showToast(icon, msg) {
+  const t = document.getElementById('toast');
+  t.querySelector('.toast-icon').textContent = icon;
+  document.getElementById('toast-msg').textContent = msg;
+  t.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.classList.remove('show'), 2400);
+}
+
+document.getElementById('genBtn').addEventListener('click', function () {
+  const template = document.getElementById('urlTemplate').value.trim();
+  const chList = chTags.getTags();
+  const loList = loTags.getTags();
+  const start = parseInt(document.getElementById('nbStart').value, 10);
+  const end = parseInt(document.getElementById('nbEnd').value, 10);
+  const padLen = parseInt(document.getElementById('nbPad').value, 10);
+
+  const summaryEl = document.getElementById('summary');
+  const resultsEl = document.getElementById('results');
+  const emptyEl = document.getElementById('empty-state');
+  const copyBtn = document.getElementById('copyAllBtn');
+  resultsEl.innerHTML = '';
+  lastGeneratedUrls = [];
+
+  if (!template || chList.length === 0 || loList.length === 0 || isNaN(start) || isNaN(end) || start > end) {
+    summaryEl.style.display = 'block';
+    summaryEl.classList.add('error');
+    summaryEl.textContent = 'URL 템플릿, {CH} 키워드, {LO} 키워드, {NB} 범위(시작 ≤ 끝)를 모두 입력해주세요.';
+    copyBtn.style.display = 'none';
+    emptyEl.style.display = 'block';
+    return;
+  }
+  summaryEl.classList.remove('error');
+
+  const nbNumbers = [];
+  for (let n = start; n <= end; n++) nbNumbers.push(n);
+
+  // LO별로 (공통 NB + 추가 번호)를 합친 개수를 미리 계산해 total에 반영
+  let nbCountTotal = 0;
+  loList.forEach(lo => {
+    const extra = loExtraNumbers[lo] || [];
+    const combinedSet = new Set(nbNumbers.map(String));
+    extra.forEach(v => combinedSet.add(String(v)));
+    nbCountTotal += combinedSet.size;
+  });
+  const total = chList.length * nbCountTotal;
+
+  summaryEl.style.display = 'inline-block';
+  summaryEl.innerHTML = 'CH ' + chList.length + ' × LO ' + loList.length + ' (NB 평균 ' + (nbCountTotal / loList.length).toFixed(1) + ') = <strong>총 ' + total + '개</strong> 링크 생성됨';
+  copyBtn.style.display = total > 0 ? 'inline-flex' : 'none';
+  emptyEl.style.display = total > 0 ? 'none' : 'block';
+
+  chList.forEach(ch => {
+    const chGroup = document.createElement('div');
+    chGroup.className = 'ch-group';
+
+    const chHeader = document.createElement('div');
+    chHeader.className = 'ch-header';
+    chHeader.innerHTML = '<span class="badge-tag">CH</span>' + escHtml(ch);
+    chGroup.appendChild(chHeader);
+
+    const chBody = document.createElement('div');
+    chBody.className = 'ch-body';
+
+    loList.forEach(lo => {
+      const loBlock = document.createElement('div');
+      const loLabel = document.createElement('div');
+      loLabel.className = 'lo-label';
+      const extra = loExtraNumbers[lo] || [];
+      loLabel.innerHTML = '<span class="badge-tag2">LO</span>' + escHtml(lo) +
+        (extra.length > 0 ? ' <span class="lo-extra-hint">+' + extra.join(',') + '</span>' : '');
+      loBlock.appendChild(loLabel);
+
+      const grid = document.createElement('div');
+      grid.className = 'nb-grid';
+
+      // 공통 NB 범위 + 이 LO에 설정된 추가 번호를 합치고, 중복 제거 후 숫자 정렬
+      const combinedSet = new Set(nbNumbers.map(String));
+      extra.forEach(v => combinedSet.add(String(v)));
+      const combinedNumbers = Array.from(combinedSet).sort((a, b) => Number(a) - Number(b));
+
+      combinedNumbers.forEach(n => {
+        const nbStr = pad(n, padLen);
+        const url = buildUrl(template, ch, lo, nbStr);
+        lastGeneratedUrls.push(url);
+
+        const item = document.createElement('div');
+        item.className = 'nb-item';
+
+        const thumb = document.createElement('div');
+        thumb.className = 'nb-thumb';
+        const img = document.createElement('img');
+        img.src = url;
+        img.alt = ch + ' ' + lo + ' ' + nbStr;
+        img.loading = 'lazy';
+        img.onerror = function () { thumb.innerHTML = '<span class="broken">✕</span>'; };
+        thumb.appendChild(img);
+
+        const link = document.createElement('a');
+        link.href = url;
+        link.target = '_blank';
+        link.rel = 'noopener noreferrer';
+        link.className = 'nb-link';
+        link.textContent = nbStr;
+        link.title = url;
+
+        item.appendChild(thumb);
+        item.appendChild(link);
+        grid.appendChild(item);
+      });
+
+      loBlock.appendChild(grid);
+      chBody.appendChild(loBlock);
+    });
+
+    chGroup.appendChild(chBody);
+    resultsEl.appendChild(chGroup);
+  });
+
+  showToast('⚡', total + '개 링크 생성 완료');
+});
+
+document.getElementById('copyAllBtn').addEventListener('click', function () {
+  if (lastGeneratedUrls.length === 0) return;
+  navigator.clipboard.writeText(lastGeneratedUrls.join('\n')).then(() => {
+    showToast('📋', '전체 링크 복사됨');
+  }).catch(() => {
+    showToast('⚠️', '복사 실패');
+  });
+});
+</script>
+</body>
+</html>
