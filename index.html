@@ -278,11 +278,11 @@ function renderVariable(v) {
   const tagsBtn = document.createElement('button');
   tagsBtn.type = 'button';
   tagsBtn.className = 'var-type-btn';
-  tagsBtn.textContent = '태그 목록';
+  tagsBtn.textContent = '태그';
   const rangeBtn = document.createElement('button');
   rangeBtn.type = 'button';
   rangeBtn.className = 'var-type-btn';
-  rangeBtn.textContent = '숫자 범위';
+  rangeBtn.textContent = '숫자';
 
   function refreshTypeButtons() {
     tagsBtn.classList.toggle('active', v.type === 'tags');
