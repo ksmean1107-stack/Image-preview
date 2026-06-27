@@ -1,0 +1,761 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ImageLink — 이미지 링크 생성기</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg: #0a0a0f; --surface: #111118; --surface2: #18181f;
+      --border: #2a2a35; --border-bright: #3d3d4f;
+      --accent: #7c6dfa; --accent2: #fa6d9e; --accent-glow: rgba(124,109,250,0.25);
+      --text: #e8e8f0; --text-muted: #6e6e88; --text-dim: #3a3a4f;
+      --success: #5af0a0; --mono: 'DM Mono', monospace; --sans: 'Syne', sans-serif;
+    }
+    html { scroll-behavior: smooth; }
+    body { background: var(--bg); color: var(--text); font-family: var(--sans); min-height: 100vh; overflow-x: hidden; }
+    body::before {
+      content: ''; position: fixed; inset: 0;
+      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.04'/%3E%3C/svg%3E");
+      pointer-events: none; z-index: 0; opacity: 0.6;
+    }
+    body::after {
+      content: ''; position: fixed; top: -200px; right: -200px; width: 700px; height: 700px;
+      border-radius: 50%; background: radial-gradient(circle, rgba(124,109,250,0.08) 0%, transparent 70%);
+      pointer-events: none; z-index: 0;
+    }
+    .container { position: relative; z-index: 1; max-width: 960px; margin: 0 auto; padding: 48px 24px 80px; }
+
+    /* HEADER */
+    header { display: flex; align-items: flex-end; justify-content: space-between; margin-bottom: 52px; padding-bottom: 28px; border-bottom: 1px solid var(--border); }
+    .logo { display: flex; flex-direction: column; gap: 4px; }
+    .logo-tag { font-family: var(--mono); font-size: 11px; color: var(--accent); letter-spacing: 0.15em; text-transform: uppercase; }
+    .logo-title { font-size: 28px; font-weight: 800; letter-spacing: -0.03em; line-height: 1; background: linear-gradient(135deg, var(--text) 0%, var(--accent) 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+    .header-badge { font-family: var(--mono); font-size: 11px; color: var(--text-muted); padding: 6px 12px; border: 1px solid var(--border); border-radius: 100px; }
+
+    /* SECTION */
+    .section-label { font-family: var(--mono); font-size: 10px; font-weight: 500; color: var(--text-muted); letter-spacing: 0.2em; text-transform: uppercase; margin-bottom: 12px; display: flex; align-items: center; gap: 8px; }
+    .section-label::after { content: ''; flex: 1; height: 1px; background: var(--border); }
+
+    .controls-panel { background: var(--surface); border: 1px solid var(--border); border-radius: 16px; padding: 24px; margin-bottom: 32px; }
+
+    .field { display: flex; flex-direction: column; gap: 6px; }
+    .field-label { font-family: var(--mono); font-size: 10px; color: var(--text-muted); letter-spacing: 0.12em; text-transform: uppercase; }
+    .field-hint { font-family: var(--mono); font-size: 10px; color: var(--text-dim); }
+    .field-hint code { color: var(--accent); }
+    input[type="text"], input[type="number"], select {
+      background: var(--surface2); border: 1px solid var(--border); border-radius: 8px; color: var(--text);
+      font-family: var(--mono); font-size: 13px; padding: 10px 14px; outline: none;
+      transition: border-color 0.15s, box-shadow 0.15s; width: 100%;
+    }
+    input[type="text"]:focus, input[type="number"]:focus, select:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-glow); }
+    input::placeholder { color: var(--text-dim); }
+    select { cursor: pointer; }
+
+    /* TAG INPUT */
+    .tagbox {
+      background: var(--surface2); border: 1px solid var(--border); border-radius: 8px;
+      padding: 8px 10px; min-height: 44px; display: flex; flex-wrap: wrap; align-items: center; gap: 8px;
+      cursor: text; transition: border-color 0.15s, box-shadow 0.15s;
+    }
+    .tagbox:focus-within { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-glow); }
+    .tag-chip {
+      display: inline-flex; align-items: center; gap: 4px;
+      background: rgba(124,109,250,0.12); border: 1px solid var(--accent);
+      color: var(--text); font-size: 12px; font-family: var(--mono);
+      padding: 4px 4px 4px 10px; border-radius: 100px;
+    }
+    .tag-chip button { border: none; background: transparent; color: var(--accent); cursor: pointer; font-size: 14px; line-height: 1; padding: 2px 6px; border-radius: 50%; }
+    .tag-chip button:hover { background: rgba(124,109,250,0.2); color: var(--accent2); }
+    .tagbox input { flex: 1; min-width: 80px; border: none !important; background: transparent !important; padding: 5px 2px !important; font-size: 13px; box-shadow: none !important; }
+    .tag-count { text-align: right; font-family: var(--mono); font-size: 9px; color: var(--text-dim); }
+
+    .range-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+    .range-row input[type="number"] { width: 80px; }
+    .range-sep { font-family: var(--mono); font-size: 14px; color: var(--text-muted); }
+    .range-row .pad-field { display: flex; align-items: center; gap: 6px; margin-left: 6px; }
+    .range-row .pad-field input { width: 56px; }
+    .range-row .pad-label { font-family: var(--mono); font-size: 10px; color: var(--text-dim); white-space: nowrap; }
+
+    /* BUTTONS */
+    .btn { font-family: var(--sans); font-weight: 700; font-size: 13px; letter-spacing: 0.02em; border: none; border-radius: 8px; cursor: pointer; padding: 11px 20px; transition: all 0.15s ease; display: inline-flex; align-items: center; gap: 7px; white-space: nowrap; }
+    .btn-primary { background: var(--accent); color: #fff; box-shadow: 0 2px 12px rgba(124,109,250,0.35); }
+    .btn-primary:hover { background: #9184fb; transform: translateY(-1px); box-shadow: 0 4px 20px rgba(124,109,250,0.45); }
+    .btn-primary:active { transform: translateY(0); }
+    .btn-primary.full { width: 100%; justify-content: center; padding: 13px 20px; font-size: 14px; }
+    .btn-ghost { background: var(--surface2); color: var(--text-muted); border: 1px solid var(--border); }
+    .btn-ghost:hover { background: var(--border); color: var(--text); }
+    .btn-danger { background: transparent; color: var(--accent2); border: 1px solid transparent; }
+    .btn-danger:hover { background: rgba(250,109,158,0.12); }
+    .btn-dashed { background: transparent; color: var(--accent); border: 1px dashed var(--accent); width: 100%; justify-content: center; }
+    .btn-dashed:hover { background: rgba(124,109,250,0.08); }
+    .btn-sm { font-size: 11px; padding: 7px 12px; border-radius: 6px; }
+    .icon-btn { grid-area: remove; background: transparent; border: none; color: var(--text-dim); cursor: pointer; padding: 4px; border-radius: 6px; display: inline-flex; align-items: center; justify-content: center; }
+    .icon-btn:hover { background: rgba(250,109,158,0.12); color: var(--accent2); }
+
+    /* VARIABLE CARD */
+    .var-card { background: var(--surface); border: 1px solid var(--border); border-radius: 16px; margin-bottom: 16px; overflow: hidden; }
+    .var-card-head {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      grid-template-areas:
+        "name remove"
+        "meta meta";
+      align-items: center;
+      gap: 10px 12px;
+      padding: 14px 18px;
+      border-bottom: 1px solid var(--border);
+      background: var(--surface2);
+    }
+    .var-name-input {
+      grid-area: name;
+      font-family: var(--mono); font-weight: 700; font-size: 14px; color: var(--accent);
+      background: transparent; border: none; border-bottom: 1px dashed var(--border-bright);
+      padding: 6px 2px; width: 100%; text-transform: uppercase; letter-spacing: 0.04em;
+    }
+    .var-name-input:focus { outline: none; border-color: var(--accent); box-shadow: none; }
+    .var-head-meta { grid-area: meta; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+    .var-token { font-family: var(--mono); font-size: 11px; color: var(--text-dim); background: var(--bg); border: 1px solid var(--border); border-radius: 6px; padding: 3px 8px; flex-shrink: 0; }
+    .var-type-toggle { display: flex; gap: 4px; }
+    .var-type-btn {
+      font-family: var(--mono); font-size: 10px; letter-spacing: 0.05em; text-transform: uppercase;
+      background: var(--bg); border: 1px solid var(--border); color: var(--text-muted);
+      padding: 6px 10px; border-radius: 100px; cursor: pointer; transition: all .15s;
+    }
+    .var-type-btn.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+    .var-card-body { padding: 18px; }
+
+    #summary { display: none; font-family: var(--mono); font-size: 11px; color: var(--text-muted); background: var(--surface2); border: 1px solid var(--border); border-radius: 100px; padding: 8px 16px; margin-bottom: 20px; }
+    #summary strong { color: var(--accent); }
+    #summary.error { color: var(--accent2); border-color: rgba(250,109,158,0.3); }
+
+    .list-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+
+    /* RESULTS */
+    .group-block { background: var(--surface); border: 1px solid var(--border); border-radius: 16px; margin-bottom: 14px; overflow: hidden; }
+    .group-header { padding: 13px 18px; font-family: var(--mono); font-weight: 500; font-size: 13px; color: var(--text); border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+    .group-header .badge-tag { font-size: 9px; color: var(--accent); letter-spacing: 0.1em; background: rgba(124,109,250,0.12); border: 1px solid var(--accent); border-radius: 4px; padding: 2px 6px; }
+    .group-body { padding: 16px 18px; }
+
+    .item-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 10px; }
+    .item-card { border: 1px solid var(--border); border-radius: 10px; padding: 6px; background: var(--surface2); display: flex; flex-direction: column; gap: 6px; transition: border-color .15s; }
+    .item-card:hover { border-color: var(--border-bright); }
+    .item-thumb { width: 100%; height: 84px; border-radius: 8px; background: var(--bg); display: flex; align-items: center; justify-content: center; overflow: hidden; }
+    .item-thumb img { max-width: 100%; max-height: 100%; object-fit: contain; display: block; }
+    .item-thumb .broken { color: var(--accent2); font-size: 20px; font-family: var(--mono); }
+    .item-link { font-family: var(--mono); font-size: 10px; color: var(--text-muted); text-decoration: none; text-align: center; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .item-link:hover { color: var(--accent); }
+
+    #empty-state { text-align: center; padding: 48px 0; color: var(--text-dim); font-family: var(--mono); font-size: 12px; }
+
+    #toast { position: fixed; bottom: 32px; right: 32px; background: var(--surface2); border: 1px solid var(--border-bright); border-radius: 10px; padding: 12px 18px; font-family: var(--mono); font-size: 12px; color: var(--text); box-shadow: 0 8px 32px rgba(0,0,0,0.4); transform: translateY(80px); opacity: 0; transition: transform 0.3s cubic-bezier(0.34,1.56,0.64,1), opacity 0.3s; z-index: 999; display: flex; align-items: center; gap: 8px; }
+    #toast.show { transform: translateY(0); opacity: 1; }
+
+    ::-webkit-scrollbar { width: 6px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: var(--border-bright); border-radius: 3px; }
+
+    @media (max-width: 600px) {
+      header { flex-direction: column; align-items: flex-start; gap: 16px; }
+    }
+  </style>
+</head>
+<body>
+<div class="container">
+  <header>
+    <div class="logo">
+      <span class="logo-tag">// image link generator</span>
+      <span class="logo-title">ImageLink</span>
+    </div>
+    <span class="header-badge">v2.0.0</span>
+  </header>
+
+  <form id="genForm" onsubmit="return false;">
+
+    <div class="section-label">01 &nbsp;URL 템플릿</div>
+    <div class="controls-panel">
+      <div class="field">
+        <span class="field-label">이미지 URL</span>
+        <span class="field-hint" id="templateHint">아래에서 변수를 만들면 <code>{변수이름}</code> 형태로 여기에 사용할 수 있어요</span>
+        <input type="text" id="urlTemplate" value="" placeholder="예) https://example.com/{CH}/{LO}_{NB}.png" />
+      </div>
+    </div>
+
+    <div class="section-label">02 &nbsp;변수 설정</div>
+    <div id="varList"></div>
+    <button type="button" class="btn btn-dashed" id="addVarBtn" style="margin-bottom: 32px;">
+      <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>
+      변수 추가하기
+    </button>
+
+    <button type="button" class="btn btn-primary full" id="genBtn">
+      <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><path d="M5 13l4 4L19 7"/></svg>
+      링크 생성하기
+    </button>
+
+  </form>
+
+  <div style="height:24px;"></div>
+
+  <div id="summary"></div>
+
+  <div class="list-header">
+    <div class="section-label" style="margin-bottom:0; flex:1;">03 &nbsp;결과</div>
+    <button class="btn btn-ghost btn-sm" id="copyAllBtn" style="display:none;">전체 링크 복사</button>
+  </div>
+
+  <div id="results"></div>
+  <div id="empty-state">변수를 만들고 링크 생성하기를 눌러보세요.</div>
+</div>
+
+<div id="toast"><span class="toast-icon"></span><span id="toast-msg"></span></div>
+
+<script>
+/* ============================================================
+   자유 변수 시스템
+   각 변수: { id, name, type: 'tags' | 'range', tags: [...],
+              rangeStart, rangeEnd, rangePad }
+   ============================================================ */
+let varCounter = 0;
+const variables = []; // { id, name, type, tags, rangeStart, rangeEnd, rangePad, el }
+
+function uid() { return 'v' + (++varCounter); }
+
+function createVariable(presetName, options) {
+  options = options || {};
+  const id = uid();
+  const v = {
+    id,
+    name: presetName || ('VAR' + variables.length),
+    type: options.type || 'tags',
+    tags: options.tags || [],
+    rangeStart: options.rangeStart != null ? options.rangeStart : 1,
+    rangeEnd: options.rangeEnd != null ? options.rangeEnd : 10,
+    rangePad: options.rangePad != null ? options.rangePad : 2,
+    rangeExtraTags: options.rangeExtraTags || [], // 범위 밖에서 추가로 포함할 숫자들
+  };
+  variables.push(v);
+  renderVariable(v);
+  updateTemplateHint();
+  return v;
+}
+
+function removeVariable(id) {
+  const idx = variables.findIndex(v => v.id === id);
+  if (idx === -1) return;
+  variables.splice(idx, 1);
+  document.getElementById('card-' + id)?.remove();
+  updateTemplateHint();
+}
+
+function updateTemplateHint() {
+  const hintEl = document.getElementById('templateHint');
+  if (variables.length === 0) {
+    hintEl.innerHTML = '아래에서 변수를 만들면 <code>{변수이름}</code> 형태로 여기에 사용할 수 있어요';
+  } else {
+    hintEl.innerHTML = '사용 가능: ' + variables.map(v => '<code>{' + escHtml(v.name || '?') + '}</code>').join(' ');
+  }
+}
+
+function renderVariable(v) {
+  const card = document.createElement('div');
+  card.className = 'var-card';
+  card.id = 'card-' + v.id;
+
+  // ---- head ----
+  const head = document.createElement('div');
+  head.className = 'var-card-head';
+
+  const nameInput = document.createElement('input');
+  nameInput.type = 'text';
+  nameInput.className = 'var-name-input';
+  nameInput.value = v.name;
+  nameInput.maxLength = 20;
+  nameInput.addEventListener('input', () => {
+    // 변수명은 영문/숫자/한글만, 공백과 중괄호는 제거
+    v.name = nameInput.value.replace(/[{}\s]/g, '');
+    updateTemplateHint();
+  });
+
+  const token = document.createElement('span');
+  token.className = 'var-token';
+  token.textContent = '{...}';
+
+  const typeToggle = document.createElement('div');
+  typeToggle.className = 'var-type-toggle';
+  const tagsBtn = document.createElement('button');
+  tagsBtn.type = 'button';
+  tagsBtn.className = 'var-type-btn';
+  tagsBtn.textContent = '태그 목록';
+  const rangeBtn = document.createElement('button');
+  rangeBtn.type = 'button';
+  rangeBtn.className = 'var-type-btn';
+  rangeBtn.textContent = '숫자 범위';
+
+  function refreshTypeButtons() {
+    tagsBtn.classList.toggle('active', v.type === 'tags');
+    rangeBtn.classList.toggle('active', v.type === 'range');
+  }
+  tagsBtn.addEventListener('click', () => { v.type = 'tags'; refreshTypeButtons(); renderBody(); });
+  rangeBtn.addEventListener('click', () => { v.type = 'range'; refreshTypeButtons(); renderBody(); });
+  refreshTypeButtons();
+
+  typeToggle.appendChild(tagsBtn);
+  typeToggle.appendChild(rangeBtn);
+
+  const removeBtn = document.createElement('button');
+  removeBtn.type = 'button';
+  removeBtn.className = 'icon-btn';
+  removeBtn.innerHTML = '<svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M3 6h18M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2m3 0l-1 14a2 2 0 01-2 2H7a2 2 0 01-2-2L4 6h16z"/></svg>';
+  removeBtn.setAttribute('aria-label', '변수 삭제');
+  removeBtn.addEventListener('click', () => removeVariable(v.id));
+
+  const headMeta = document.createElement('div');
+  headMeta.className = 'var-head-meta';
+  headMeta.appendChild(token);
+  headMeta.appendChild(typeToggle);
+
+  head.appendChild(nameInput);
+  head.appendChild(removeBtn);
+  head.appendChild(headMeta);
+
+  // ---- body ----
+  const body = document.createElement('div');
+  body.className = 'var-card-body';
+
+  function renderBody() {
+    body.innerHTML = '';
+    if (v.type === 'tags') {
+      const tagbox = document.createElement('div');
+      tagbox.className = 'tagbox';
+      const input = document.createElement('input');
+      input.type = 'text';
+      input.placeholder = '단어 입력 후 엔터';
+      input.enterKeyHint = 'done';
+      input.autocomplete = 'off';
+      input.autocorrect = 'off';
+
+      function renderTags() {
+        tagbox.querySelectorAll('.tag-chip').forEach(el => el.remove());
+        v.tags.forEach((tag, idx) => {
+          const chip = document.createElement('span');
+          chip.className = 'tag-chip';
+          const label = document.createElement('span');
+          label.textContent = tag;
+          chip.appendChild(label);
+          const rm = document.createElement('button');
+          rm.type = 'button';
+          rm.textContent = '×';
+          rm.addEventListener('click', (ev) => {
+            ev.preventDefault(); ev.stopPropagation();
+            v.tags.splice(idx, 1);
+            renderTags();
+          });
+          chip.appendChild(rm);
+          tagbox.insertBefore(chip, input);
+        });
+        countEl.textContent = v.tags.length + '개';
+      }
+
+      function commit() {
+        const val = input.value.trim();
+        if (val && !v.tags.includes(val)) v.tags.push(val);
+        input.value = '';
+        renderTags();
+      }
+
+      input.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' || e.keyCode === 13) {
+          e.preventDefault(); e.stopPropagation();
+          commit(); input.focus(); return false;
+        }
+        if (e.key === 'Backspace' && input.value === '' && v.tags.length > 0) {
+          v.tags.pop(); renderTags();
+        }
+      });
+      input.addEventListener('keypress', (e) => {
+        if (e.key === 'Enter' || e.keyCode === 13) { e.preventDefault(); e.stopPropagation(); return false; }
+      });
+      input.addEventListener('input', (e) => {
+        if (e.inputType === 'insertLineBreak' || input.value.includes('\n')) {
+          input.value = input.value.replace(/\n/g, '');
+          commit(); input.focus();
+        }
+      });
+      tagbox.addEventListener('click', () => input.focus());
+
+      tagbox.appendChild(input);
+
+      const countEl = document.createElement('div');
+      countEl.className = 'tag-count';
+
+      body.appendChild(tagbox);
+      body.appendChild(countEl);
+      renderTags();
+    } else {
+      const rangeRow = document.createElement('div');
+      rangeRow.className = 'range-row';
+
+      const startInput = document.createElement('input');
+      startInput.type = 'number';
+      startInput.value = v.rangeStart;
+      startInput.addEventListener('input', () => { v.rangeStart = parseInt(startInput.value, 10); });
+
+      const sep = document.createElement('span');
+      sep.className = 'range-sep';
+      sep.textContent = '~';
+
+      const endInput = document.createElement('input');
+      endInput.type = 'number';
+      endInput.value = v.rangeEnd;
+      endInput.addEventListener('input', () => { v.rangeEnd = parseInt(endInput.value, 10); });
+
+      const padField = document.createElement('div');
+      padField.className = 'pad-field';
+      const padLabel = document.createElement('span');
+      padLabel.className = 'pad-label';
+      padLabel.textContent = '자릿수';
+      const padInput = document.createElement('input');
+      padInput.type = 'number';
+      padInput.min = 1; padInput.max = 6;
+      padInput.value = v.rangePad;
+      padInput.addEventListener('input', () => { v.rangePad = parseInt(padInput.value, 10); });
+      padField.appendChild(padLabel);
+      padField.appendChild(padInput);
+
+      rangeRow.appendChild(startInput);
+      rangeRow.appendChild(sep);
+      rangeRow.appendChild(endInput);
+      rangeRow.appendChild(padField);
+
+      const hint = document.createElement('div');
+      hint.className = 'field-hint';
+      hint.style.marginTop = '8px';
+      hint.textContent = '자릿수 1=1, 2=01, 3=001';
+
+      body.appendChild(rangeRow);
+      body.appendChild(hint);
+
+      // ---- 추가 숫자 (범위 밖 숫자를 따로 더할 수 있는 칸) ----
+      const extraLabel = document.createElement('div');
+      extraLabel.className = 'field-label';
+      extraLabel.style.marginTop = '16px';
+      extraLabel.style.marginBottom = '6px';
+      extraLabel.textContent = '추가 숫자 (범위 밖에서 더 포함할 숫자)';
+
+      const extraTagbox = document.createElement('div');
+      extraTagbox.className = 'tagbox';
+      const extraInput = document.createElement('input');
+      extraInput.type = 'text';
+      extraInput.inputMode = 'numeric';
+      extraInput.placeholder = '숫자 입력 후 엔터 (예: 11)';
+      extraInput.enterKeyHint = 'done';
+      extraInput.autocomplete = 'off';
+      extraInput.autocorrect = 'off';
+
+      function renderExtraTags() {
+        extraTagbox.querySelectorAll('.tag-chip').forEach(el => el.remove());
+        v.rangeExtraTags.forEach((tag, idx) => {
+          const chip = document.createElement('span');
+          chip.className = 'tag-chip';
+          const label = document.createElement('span');
+          label.textContent = tag;
+          chip.appendChild(label);
+          const rm = document.createElement('button');
+          rm.type = 'button';
+          rm.textContent = '×';
+          rm.addEventListener('click', (ev) => {
+            ev.preventDefault(); ev.stopPropagation();
+            v.rangeExtraTags.splice(idx, 1);
+            renderExtraTags();
+          });
+          chip.appendChild(rm);
+          extraTagbox.insertBefore(chip, extraInput);
+        });
+      }
+
+      function commitExtra() {
+        const val = extraInput.value.trim();
+        // 숫자만 허용 (음수/소수 제외한 자연수)
+        if (val && /^\d+$/.test(val) && !v.rangeExtraTags.includes(val)) {
+          v.rangeExtraTags.push(val);
+        }
+        extraInput.value = '';
+        renderExtraTags();
+      }
+
+      extraInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' || e.keyCode === 13) {
+          e.preventDefault(); e.stopPropagation();
+          commitExtra(); extraInput.focus(); return false;
+        }
+        if (e.key === 'Backspace' && extraInput.value === '' && v.rangeExtraTags.length > 0) {
+          v.rangeExtraTags.pop(); renderExtraTags();
+        }
+      });
+      extraInput.addEventListener('keypress', (e) => {
+        if (e.key === 'Enter' || e.keyCode === 13) { e.preventDefault(); e.stopPropagation(); return false; }
+      });
+      extraInput.addEventListener('input', (e) => {
+        if (e.inputType === 'insertLineBreak' || extraInput.value.includes('\n')) {
+          extraInput.value = extraInput.value.replace(/\n/g, '');
+          commitExtra(); extraInput.focus();
+        }
+      });
+      extraTagbox.addEventListener('click', () => extraInput.focus());
+
+      extraTagbox.appendChild(extraInput);
+      renderExtraTags();
+
+      body.appendChild(extraLabel);
+      body.appendChild(extraTagbox);
+    }
+  }
+  renderBody();
+
+  card.appendChild(head);
+  card.appendChild(body);
+  document.getElementById('varList').appendChild(card);
+}
+
+document.getElementById('addVarBtn').addEventListener('click', () => createVariable());
+
+/* ---- helpers ---- */
+function escHtml(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+function pad(n, len) {
+  if (!len || len < 1) len = 1;
+  return String(n).padStart(len, '0');
+}
+
+function getVariableValues(v) {
+  if (v.type === 'tags') {
+    return v.tags.slice();
+  } else {
+    const start = v.rangeStart, end = v.rangeEnd, padLen = v.rangePad;
+    const numSet = new Set();
+    if (!isNaN(start) && !isNaN(end) && start <= end) {
+      for (let n = start; n <= end; n++) numSet.add(n);
+    }
+    // 범위 밖에서 별도로 추가한 숫자들도 합치기 (중복 제거)
+    (v.rangeExtraTags || []).forEach(t => {
+      const n = parseInt(t, 10);
+      if (!isNaN(n)) numSet.add(n);
+    });
+    const nums = Array.from(numSet).sort((a, b) => a - b);
+    return nums.map(n => pad(n, padLen));
+  }
+}
+
+let lastGeneratedUrls = [];
+let toastTimer;
+function showToast(icon, msg) {
+  const t = document.getElementById('toast');
+  t.querySelector('.toast-icon').textContent = icon;
+  document.getElementById('toast-msg').textContent = msg;
+  t.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.classList.remove('show'), 2400);
+}
+
+/* ---- generation ---- */
+document.getElementById('genBtn').addEventListener('click', function () {
+  const template = document.getElementById('urlTemplate').value.trim();
+  const summaryEl = document.getElementById('summary');
+  const resultsEl = document.getElementById('results');
+  const emptyEl = document.getElementById('empty-state');
+  const copyBtn = document.getElementById('copyAllBtn');
+  resultsEl.innerHTML = '';
+  lastGeneratedUrls = [];
+
+  // 유효성 검사
+  if (!template) {
+    summaryEl.style.display = 'block'; summaryEl.classList.add('error');
+    summaryEl.textContent = 'URL 템플릿을 입력해주세요.';
+    copyBtn.style.display = 'none'; emptyEl.style.display = 'block';
+    return;
+  }
+  if (variables.length === 0) {
+    summaryEl.style.display = 'block'; summaryEl.classList.add('error');
+    summaryEl.textContent = '변수를 하나 이상 추가해주세요.';
+    copyBtn.style.display = 'none'; emptyEl.style.display = 'block';
+    return;
+  }
+
+  const valueSets = [];
+  for (const v of variables) {
+    const name = (v.name || '').trim();
+    if (!name) {
+      summaryEl.style.display = 'block'; summaryEl.classList.add('error');
+      summaryEl.textContent = '모든 변수에 이름을 입력해주세요.';
+      copyBtn.style.display = 'none'; emptyEl.style.display = 'block';
+      return;
+    }
+    const values = getVariableValues(v);
+    if (values.length === 0) {
+      summaryEl.style.display = 'block'; summaryEl.classList.add('error');
+      summaryEl.textContent = '"' + name + '" 변수에 값이 비어있어요. (태그를 추가하거나 범위를 올바르게 입력해주세요)';
+      copyBtn.style.display = 'none'; emptyEl.style.display = 'block';
+      return;
+    }
+    if (!template.includes('{' + name + '}')) {
+      summaryEl.style.display = 'block'; summaryEl.classList.add('error');
+      summaryEl.textContent = 'URL 템플릿에 {' + name + '} 이(가) 사용되지 않았어요. 템플릿을 확인해주세요.';
+      copyBtn.style.display = 'none'; emptyEl.style.display = 'block';
+      return;
+    }
+    valueSets.push({ name, values });
+  }
+  summaryEl.classList.remove('error');
+
+  const total = valueSets.reduce((acc, vs) => acc * vs.values.length, 1);
+  summaryEl.style.display = 'inline-block';
+  summaryEl.innerHTML = valueSets.map(vs => vs.name + ' ' + vs.values.length).join(' × ') + ' = <strong>총 ' + total + '개</strong> 링크 생성됨';
+  copyBtn.style.display = total > 0 ? 'inline-flex' : 'none';
+  emptyEl.style.display = total > 0 ? 'none' : 'block';
+
+  if (total === 0) return;
+
+  // 모든 조합 생성 (cartesian product)
+  function cartesian(sets) {
+    return sets.reduce((acc, set) => {
+      const out = [];
+      acc.forEach(combo => {
+        set.values.forEach(val => {
+          out.push(combo.concat([{ name: set.name, value: val }]));
+        });
+      });
+      return out;
+    }, [[]]);
+  }
+  const combos = cartesian(valueSets);
+
+  // 첫 번째 변수로 그룹핑, 두 번째 변수가 있으면 그 안에서 한 번 더 그룹핑, 나머지는 평면 그리드
+  const groupDepth = Math.min(2, valueSets.length); // 최대 2단계까지 트리, 나머지는 그리드로
+
+  function buildUrl(combo) {
+    let url = template;
+    combo.forEach(c => { url = url.split('{' + c.name + '}').join(c.value); });
+    return url;
+  }
+
+  function makeItemCard(combo) {
+    const url = buildUrl(combo);
+    lastGeneratedUrls.push(url);
+    const labelParts = combo.map(c => c.value).join('_');
+
+    const item = document.createElement('div');
+    item.className = 'item-card';
+    const thumb = document.createElement('div');
+    thumb.className = 'item-thumb';
+    const img = document.createElement('img');
+    img.src = url;
+    img.alt = labelParts;
+    img.loading = 'lazy';
+    img.onerror = function () { thumb.innerHTML = '<span class="broken">✕</span>'; };
+    thumb.appendChild(img);
+
+    const link = document.createElement('a');
+    link.href = url; link.target = '_blank'; link.rel = 'noopener noreferrer';
+    link.className = 'item-link';
+    // 그룹핑에 안 쓰인 나머지 변수 값들만 라벨로 표시
+    const labelCombo = combo.slice(groupDepth);
+    link.textContent = labelCombo.length > 0 ? labelCombo.map(c => c.value).join('_') : labelParts;
+    link.title = url;
+
+    item.appendChild(thumb);
+    item.appendChild(link);
+    return item;
+  }
+
+  if (valueSets.length === 1) {
+    // 변수 1개: 그룹 없이 바로 그리드
+    const grid = document.createElement('div');
+    grid.className = 'item-grid';
+    combos.forEach(combo => grid.appendChild(makeItemCard(combo)));
+    resultsEl.appendChild(grid);
+    showToast('⚡', total + '개 링크 생성 완료');
+    return;
+  }
+
+  // 1단계 그룹: 첫 변수 값별로 묶음
+  const level1Map = new Map();
+  combos.forEach(combo => {
+    const key = combo[0].value;
+    if (!level1Map.has(key)) level1Map.set(key, []);
+    level1Map.get(key).push(combo);
+  });
+
+  level1Map.forEach((comboList, level1Val) => {
+    const groupEl = document.createElement('div');
+    groupEl.className = 'group-block';
+
+    const header = document.createElement('div');
+    header.className = 'group-header';
+    header.innerHTML = '<span class="badge-tag">' + escHtml(valueSets[0].name) + '</span>' + escHtml(level1Val);
+    groupEl.appendChild(header);
+
+    const groupBody = document.createElement('div');
+    groupBody.className = 'group-body';
+
+    if (valueSets.length === 2) {
+      // 2단계: 그룹 안에 바로 그리드
+      const grid = document.createElement('div');
+      grid.className = 'item-grid';
+      comboList.forEach(combo => grid.appendChild(makeItemCard(combo)));
+      groupBody.appendChild(grid);
+    } else {
+      // 3개 이상: 2번째 변수로 한 번 더 그룹핑, 나머지는 그리드
+      const level2Map = new Map();
+      comboList.forEach(combo => {
+        const key = combo[1].value;
+        if (!level2Map.has(key)) level2Map.set(key, []);
+        level2Map.get(key).push(combo);
+      });
+      level2Map.forEach((subList, level2Val) => {
+        const subWrap = document.createElement('div');
+        subWrap.style.marginBottom = '16px';
+        const subLabel = document.createElement('div');
+        subLabel.style.fontFamily = 'var(--mono)';
+        subLabel.style.fontSize = '11px';
+        subLabel.style.color = 'var(--text-muted)';
+        subLabel.style.marginBottom = '10px';
+        subLabel.innerHTML = '<span class="badge-tag" style="color:var(--accent2); background:rgba(250,109,158,0.12); border-color:var(--accent2);">' + escHtml(valueSets[1].name) + '</span> ' + escHtml(level2Val);
+        subWrap.appendChild(subLabel);
+
+        const grid = document.createElement('div');
+        grid.className = 'item-grid';
+        subList.forEach(combo => grid.appendChild(makeItemCard(combo)));
+        subWrap.appendChild(grid);
+        groupBody.appendChild(subWrap);
+      });
+    }
+
+    groupEl.appendChild(groupBody);
+    resultsEl.appendChild(groupEl);
+  });
+
+  showToast('⚡', total + '개 링크 생성 완료');
+});
+
+document.getElementById('copyAllBtn').addEventListener('click', function () {
+  if (lastGeneratedUrls.length === 0) return;
+  navigator.clipboard.writeText(lastGeneratedUrls.join('\n')).then(() => {
+    showToast('📋', '전체 링크 복사됨');
+  }).catch(() => {
+    showToast('⚠️', '복사 실패');
+  });
+});
+
+/* ---- 초기 변수 2개 기본 생성 (예시: CH 태그형, NB 범위형) ---- */
+(function init() {
+  createVariable('CH', { type: 'tags', tags: [] });
+  createVariable('NB', { type: 'range', rangeStart: 1, rangeEnd: 10, rangePad: 2 });
+  document.getElementById('urlTemplate').value = 'https://example.com/{CH}_{NB}.png';
+  document.getElementById('urlTemplate').placeholder = '예) https://example.com/{CH}_{NB}.png';
+})();
+</script>
+</body>
+</html>
