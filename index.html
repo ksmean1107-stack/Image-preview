@@ -262,7 +262,7 @@ function renderVariable(v) {
   nameInput.type = 'text';
   nameInput.className = 'var-name-input';
   nameInput.value = v.name;
-  nameInput.maxLength = 10;
+  nameInput.maxLength = 20;
   nameInput.addEventListener('input', () => {
     // 변수명은 영문/숫자/한글만, 공백과 중괄호는 제거
     v.name = nameInput.value.replace(/[{}\s]/g, '');
@@ -316,6 +316,7 @@ function renderVariable(v) {
       tagbox.className = 'tagbox';
       const input = document.createElement('input');
       input.type = 'text';
+      input.maxLength = 10;
       input.placeholder = '단어 입력 후 엔터';
       input.enterKeyHint = 'done';
       input.autocomplete = 'off';
