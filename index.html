@@ -262,7 +262,7 @@ function renderVariable(v) {
   nameInput.type = 'text';
   nameInput.className = 'var-name-input';
   nameInput.value = v.name;
-  nameInput.maxLength = 20;
+  nameInput.maxLength = 10;
   nameInput.addEventListener('input', () => {
     // 변수명은 영문/숫자/한글만, 공백과 중괄호는 제거
     v.name = nameInput.value.replace(/[{}\s]/g, '');
